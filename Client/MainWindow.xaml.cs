@@ -42,11 +42,11 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
         set { SetValue(IsTextBoxEnabledProperty, value); }
     }
     #endregion
- 
+
     Command cmd;
     private TcpClient client;
     public ObservableCollection<Car> Cars { get; set; }
-    
+
     public MainWindow()
     {
         InitializeComponent();
@@ -71,7 +71,6 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
 
     private void cmbCommand_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-
         if (cmbCommand.SelectedItem is HttpMethods method)
         {
             cmd.Method = method;
@@ -81,8 +80,7 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                 case HttpMethods.GET:
                 case HttpMethods.DELETE:
                     requestGrid.Children.OfType<TextBox>().Where(t => t != txtId).ToList()
-                       .ForEach(txt => txt.Text = string.Empty);
-
+                      .ForEach(txt => txt.Text = string.Empty);
                     IsTextBoxEnabled = false;
                     break;
                 case HttpMethods.POST:
@@ -108,30 +106,32 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                 {
                     if (Car.Id < 0)
                     {
-                        MessageBox.Show("Entered id is invalid");
+                        MessageBox.Show("Id is invalid!");
                         return;
                     }
 
                     cmd.Car = Car;
-                    var jsonStr = JsonSerializer.Serialize(cmd);
+                    var request = JsonSerializer.Serialize(cmd);
+                    bw.Write(request);
 
-                    bw.Write(jsonStr);
-
-                    await Task.Delay(50);
+                    await Task.Delay(60);
 
                     if (Car.Id == 0)
                     {
-                        var jsonCars = br.ReadString();
-                        var cars = JsonSerializer.Deserialize<List<Car>>(jsonCars);
+                        var allCars = br.ReadString();
+                        var cars = JsonSerializer.Deserialize<List<Car>>(allCars);
+
                         Cars.Clear();
+
                         foreach (var c in cars)
                             Cars.Add(c);
 
                         return;
                     }
 
-                    var jsonResponse = br.ReadString();
-                    var car = JsonSerializer.Deserialize<Car>(jsonResponse);
+                    var response = br.ReadString();
+
+                    var car = JsonSerializer.Deserialize<Car>(response);
 
                     if (car != null)
                     {
@@ -140,27 +140,17 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                     }
                     else
                     {
-                        MessageBox.Show("Car with such id not found");
+                        MessageBox.Show($"Car not found with this '{Car.Id}' Id");
                         Cars.Clear();
                     }
 
                     break;
                 }
+
+
             case HttpMethods.POST:
                 {
-
-                    var sb = new StringBuilder();
-
-                    if (Car.Id <= 0)
-                        sb.Append("Entered id is invalid");
-                    if (Car.Year < 1960 || Car.Year > DateTime.Now.Year)
-                        sb.Append("Entered year is invalid");
-
-                    if (string.IsNullOrWhiteSpace(Car.Make)
-                        || string.IsNullOrWhiteSpace(Car.Model)
-                        || string.IsNullOrWhiteSpace(Car.VIN)
-                        || string.IsNullOrEmpty(Car.Color))
-                        sb.Append("Please enter all required information");
+                    var sb = CheckValidation();
 
                     if (sb.Length > 0)
                     {
@@ -169,39 +159,26 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                     }
 
                     cmd.Car = Car;
-                    var jsonStr = JsonSerializer.Serialize(cmd);
+                    var request = JsonSerializer.Serialize(cmd);
 
-                    bw.Write(jsonStr);
+                    bw.Write(request);
 
-                    await Task.Delay(50);
+                    await Task.Delay(60);
+
 
                     var isPosted = br.ReadBoolean();
-                    var resultText = string.Empty;
-
-                    if (isPosted)
-                        resultText = "Added succesfully";
-                    else
-                        resultText = "Car with such id already Exists";
-
-                    MessageBox.Show(resultText);
+                    
+                    var msg = isPosted ? "Posted successfully" : $"Car already exists with Id '{Car.Id}'!";
+                    
+                    MessageBox.Show(msg);
+                   
                     Cars.Clear();
 
                     break;
                 }
             case HttpMethods.PUT:
                 {
-                    var sb = new StringBuilder();
-
-                    if (Car.Id <= 0)
-                        sb.Append("Entered id is invalid");
-                    if (Car.Year < 1960 || Car.Year > DateTime.Now.Year)
-                        sb.Append("Entered year is invalid");
-
-                    if (string.IsNullOrWhiteSpace(Car.Make)
-                        || string.IsNullOrWhiteSpace(Car.Model)
-                        || string.IsNullOrWhiteSpace(Car.VIN)
-                        || string.IsNullOrEmpty(Car.Color))
-                        sb.Append("Please enter all required information");
+                    StringBuilder sb = CheckValidation();
 
                     if (sb.Length > 0)
                     {
@@ -210,22 +187,18 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                     }
 
                     cmd.Car = Car;
-                    var jsonStr = JsonSerializer.Serialize(cmd);
+                    var request = JsonSerializer.Serialize(cmd);
 
 
-                    bw.Write(jsonStr);
+                    bw.Write(request);
 
-                    await Task.Delay(50);
+                    await Task.Delay(60);
 
                     var isPosted = br.ReadBoolean();
-                    var resultText = string.Empty;
+                    
+                    var msg = isPosted ? "Updated successfully!" : $"Car is not exist with this '{Car.Id}' Id!";
 
-                    if (isPosted)
-                        resultText = "Updated succesfully";
-                    else
-                        resultText = "Car with such id doesn't Exists";
-
-                    MessageBox.Show(resultText);
+                    MessageBox.Show(msg);
                     Cars.Clear();
 
                     break;
@@ -239,25 +212,39 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                     }
 
                     cmd.Car = Car;
-                    var jsonStr = JsonSerializer.Serialize(cmd);
+                    var request = JsonSerializer.Serialize(cmd);
 
-                    bw.Write(jsonStr);
+                    bw.Write(request);
 
-                    await Task.Delay(50);
+                    await Task.Delay(60);
 
-                    var isDeleted = br.ReadBoolean();
+                    var isDeleted = br.ReadBoolean();            
+                    var msg = isDeleted ? "Deleted succesfully!" : $"Car not found with this '{Car.Id}' Id!";
+                    MessageBox.Show(msg);
 
-                    var resultText = string.Empty;
-
-                    if (isDeleted)
-                        resultText = "Deleted succesfully";
-                    else
-                        resultText = "Car with such id not found";
-
-                    MessageBox.Show(resultText);
                     Cars.Clear();
                     break;
                 }
         }
+    }
+
+    private StringBuilder CheckValidation()
+    {
+        var sb = new StringBuilder();
+        var validYear = 1970;
+
+        if (Car.Id <= 0)
+            sb.Append("Id is invalid!");
+
+        if (Car.Year < validYear || Car.Year > DateTime.Now.Year)
+            sb.Append($"Year is invalid! (Valid Year: {validYear} and upper)");
+
+        if (string.IsNullOrWhiteSpace(Car.Make)
+            || string.IsNullOrWhiteSpace(Car.Model)
+            || string.IsNullOrWhiteSpace(Car.VIN)
+            || string.IsNullOrEmpty(Car.Color))
+            sb.Append("Please complete all required information!");
+
+        return sb;
     }
 }
