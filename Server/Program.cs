@@ -3,13 +3,18 @@ using System.Net.Sockets;
 using System.Net;
 using System.Text.Json;
 using CarServerLib;
+using System.Collections.Concurrent;
 
 List<Car> cars = null!;
 
 if (File.Exists(@"..\..\..\Cars.json"))
-    cars = JsonSerializer.Deserialize<List<Car>>(File.ReadAllText(@"..\..\..\Cars.json"))!;
+{
+    var jsonCars = File.ReadAllText(@"..\..\..\Cars.json");
+    cars = JsonSerializer.Deserialize<List<Car>>(jsonCars)!;
+}
 
-cars ??= new();
+if (cars is null)
+    cars = new();
 
 var listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 12345);
 
@@ -22,125 +27,106 @@ while (true)
 
     Console.WriteLine($"Client {client.Client.RemoteEndPoint} accepted");
 
-   await Task.Run(() => 
-   {
-       NetworkStream stream = null;
-       try
-       {
-        stream = client.GetStream();
-       }
-       catch (Exception ex)
-       {
-           Console.WriteLine(ex.Message.ToString());
-       }
-       var bw = new BinaryWriter(stream);
-       var br = new BinaryReader(stream);
+    await Task.Run(() =>
+    {
+        var stream = client.GetStream();
+        var bw = new BinaryWriter(stream);
+        var br = new BinaryReader(stream);
 
-       while (true)
-       {
-           var jsonStr = br.ReadString();
+        while (true)
+        {
+            var request = br.ReadString();
 
-           var command = JsonSerializer.Deserialize<Command>(jsonStr);
+            var command = JsonSerializer.Deserialize<Command>(request);
 
-           if (command is null)
-               continue;
+            if (command is null)
+                continue;
 
-           switch (command.Method)
-           {
-               case HttpMethods.GET:
-                   {
-                       var id = command.Car?.Id;
-                       if (id == 0)
-                       {
-                           var jsonCars = JsonSerializer.Serialize(cars);
-                           bw.Write(jsonCars);
-                           break;
-                       }
+            switch (command.Method)
+            {
+                case HttpMethods.GET:
+                    {
+                        var id = command.Car?.Id;
+                        if (id == 0)
+                        {
+                            var result = JsonSerializer.Serialize(cars);
+                            bw.Write(result);
+                            break;
+                        }
 
-                       Car? car = null;
-                       cars.FindAll(c=>c.Id == id);
-                       car = cars.FirstOrDefault(c => c.Id == id);
+                        Car? car = null;
+                        cars.FindAll(c => c.Id == id);
+                        car = cars.FirstOrDefault(c => c.Id == id);
 
-                       var jsonResponse = JsonSerializer.Serialize(car);
-                       bw.Write(jsonResponse);
-                       break;
-                   }
-               case HttpMethods.POST:
-                   {
-                       var id = command.Car?.Id;
-                       var canBePosted = !cars.Any(c => c.Id == id);
+                        var response = JsonSerializer.Serialize(car);
+                        bw.Write(response);
+                        break;
+                    }
+                case HttpMethods.POST:
+                    {
+                        var id = command.Car?.Id;
+                        var canPosted = !cars.Any(c => c.Id == id);
 
-                       if (canBePosted)
-                       {
-                           if (command.Car is not null)
-                               lock (sync)
-                               {
-                                   cars.Add(command.Car);
-                               }
-                       }
+                        if (canPosted)
+                        {
+                            if (command.Car is not null)
+                            {
+                                lock (sync)
+                                {
+                                    cars.Add(command.Car);
+                                }
+                            }
+                        }
 
-                       bw.Write(canBePosted);
+                        bw.Write(canPosted);
 
-                       break;
-                   }
-               case HttpMethods.PUT:
-                   {
-                       var id = command.Car?.Id;
-                       var insertIndex = -1;
-                       var canBePuted = false;
-                       foreach (var c in cars)
-                       {
-                           if (c.Id == id)
-                           {
-                               canBePuted = true;
-                               lock (sync)
-                               {
-                                   insertIndex = cars.IndexOf(c);
-                               }
-                               cars.Remove(c);
-                               break;
-                           }
-                       }
+                        break;
+                    }
+                case HttpMethods.PUT:
+                    {
+                        var id = command.Car?.Id;
+                        var carIndex = cars.FindIndex(c => c.Id == id);
+                        var canPut = carIndex >= 0;
+                        if (canPut)
+                        {
+                            lock (sync)
+                            {
+                                cars[carIndex] = command.Car!;
+                            }
+                        }
+                        bw.Write(canPut);
+                        break;
+                    }
 
-                       if (canBePuted)
-                       {
-                           if (command.Car is not null)
-                               lock (sync)
-                               {
-                                   cars.Insert(insertIndex, command.Car);
-                               }
-                       }
-                       bw.Write(canBePuted);
+                case HttpMethods.DELETE:
+                    {
+                        var isDeleted = false;
+                        var id = command.Car?.Id;
+                        var carToRemove = cars.FirstOrDefault(c => c.Id == id);
 
-                       break;
-                   }
+                        if (carToRemove != null)
+                        {
+                            lock (sync)
+                            {
+                                cars.Remove(carToRemove);
+                            }
+                            isDeleted = true;
+                        }
+                        bw.Write(isDeleted);
+                        break;
+                    }
+            }
 
-               case HttpMethods.DELETE:
-                   {
-                       var isDeleted = false;
-                       var id = command.Car?.Id;
-                       foreach (var c in cars)
-                       {
-                           if (c.Id == id)
-                           {
-                               lock (sync)
-                               {
-                                   cars.Remove(c);
-                               }
-                               isDeleted = true;
-                               break;
-                           }
-                       }
-                       bw.Write(isDeleted);
-                       break;
-                   }
-           }
+            SaveCarsToFile(cars, sync);
+        }
+    });
+}
 
-           lock (sync)
-           {
-               var jsonCars = JsonSerializer.Serialize(cars);
-               File.WriteAllTextAsync(@"..\..\..\Cars.json", jsonCars);
-           }
-       }
-   });
+static void SaveCarsToFile(List<Car> cars, object sync)
+{
+    lock (sync)
+    {
+        var jsonCars = JsonSerializer.Serialize(cars);
+        File.WriteAllTextAsync(@"..\..\..\Cars.json", jsonCars);
+    }
 }

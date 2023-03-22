@@ -22,7 +22,7 @@ namespace Client;
 
 public partial class MainWindow : Window
 {
-    #region DependencyProperties
+    #region DependencyPropForBinding
 
     public static readonly DependencyProperty CarProperty =
 DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
@@ -56,11 +56,11 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
         Car = new();
         Cars = new();
         cmd = new Command();
+        cmbCommand.ItemsSource = Enum.GetValues(typeof(HttpMethods)).Cast<HttpMethods>();
         cmbCommand.SelectedIndex = 0;
     }
 
-    private void Window_Loaded(object sender, RoutedEventArgs e) =>
-        cmbCommand.ItemsSource = Enum.GetValues(typeof(HttpMethods)).Cast<HttpMethods>();
+
 
 
     private void BtnRequest_Click(object sender, RoutedEventArgs e)
@@ -93,7 +93,6 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
     }
 
 
-
     private async void SendRequest(HttpMethods method)
     {
         var stream = client.GetStream();
@@ -114,7 +113,7 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                     var request = JsonSerializer.Serialize(cmd);
                     bw.Write(request);
 
-                    await Task.Delay(60);
+                    await Task.Delay(30);
 
                     if (Car.Id == 0)
                     {
@@ -123,7 +122,7 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
 
                         Cars.Clear();
 
-                        foreach (var c in cars)
+                        foreach (var c in cars!)
                             Cars.Add(c);
 
                         return;
@@ -140,7 +139,7 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                     }
                     else
                     {
-                        MessageBox.Show($"Car not found with this '{Car.Id}' Id");
+                        MessageBox.Show($"Car not found with this '{Car.Id}' Id!");
                         Cars.Clear();
                     }
 
@@ -163,12 +162,11 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
 
                     bw.Write(request);
 
-                    await Task.Delay(60);
-
+                    await Task.Delay(30);
 
                     var isPosted = br.ReadBoolean();
                     
-                    var msg = isPosted ? "Posted successfully" : $"Car already exists with Id '{Car.Id}'!";
+                    var msg = isPosted ? "Posted successfully!" : $"Car already exists with Id '{Car.Id}'!";
                     
                     MessageBox.Show(msg);
                    
@@ -176,6 +174,7 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
 
                     break;
                 }
+
             case HttpMethods.PUT:
                 {
                     StringBuilder sb = CheckValidation();
@@ -189,10 +188,9 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                     cmd.Car = Car;
                     var request = JsonSerializer.Serialize(cmd);
 
-
                     bw.Write(request);
 
-                    await Task.Delay(60);
+                    await Task.Delay(30);
 
                     var isPosted = br.ReadBoolean();
                     
@@ -207,7 +205,7 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
                 {
                     if (Car.Id <= 0)
                     {
-                        MessageBox.Show("Entered id is invalid");
+                        MessageBox.Show("Id is invalid!");
                         return;
                     }
 
@@ -216,10 +214,10 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
 
                     bw.Write(request);
 
-                    await Task.Delay(60);
+                    await Task.Delay(30);
 
-                    var isDeleted = br.ReadBoolean();            
-                    var msg = isDeleted ? "Deleted succesfully!" : $"Car not found with this '{Car.Id}' Id!";
+                    var isDeleted = br.ReadBoolean();
+                    var msg = isDeleted ? "Deleted successfully!" : $"Car not found with this '{Car.Id}' Id!";
                     MessageBox.Show(msg);
 
                     Cars.Clear();
@@ -247,4 +245,6 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
 
         return sb;
     }
+
+
 }
