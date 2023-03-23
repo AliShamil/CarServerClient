@@ -9,11 +9,11 @@
         Title="MainWindow" Height="450" Width="800" >
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="140"/>
+            <RowDefinition Height="120"/>
             <RowDefinition/>
         </Grid.RowDefinitions>
 
-        <Grid x:Name="requestGrid">
+        <Grid x:Name="CarGrid">
             <Grid.RowDefinitions>
                 <RowDefinition />
                 <RowDefinition />
@@ -37,7 +37,7 @@
             <TextBox
                 Grid.Row="1"
                 Name="txtId"
-                materialDesign:HintAssist.Hint="Id"
+                materialDesign:HintAssist.Hint="ID"
                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
                 Text="{Binding Car.Id,Mode=TwoWay}"
                 Margin="5"/>

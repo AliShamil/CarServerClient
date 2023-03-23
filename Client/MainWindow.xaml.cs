@@ -61,8 +61,6 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
     }
 
 
-
-
     private void BtnRequest_Click(object sender, RoutedEventArgs e)
     {
         if (cmbCommand.SelectedItem is HttpMethods method)
@@ -79,7 +77,7 @@ DependencyProperty.Register("Car", typeof(Car), typeof(MainWindow));
             {
                 case HttpMethods.GET:
                 case HttpMethods.DELETE:
-                    requestGrid.Children.OfType<TextBox>().Where(t => t != txtId).ToList()
+                    CarGrid.Children.OfType<TextBox>().Where(t => t != txtId).ToList()
                       .ForEach(txt => txt.Text = string.Empty);
                     IsTextBoxEnabled = false;
                     break;
